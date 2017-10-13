@@ -25,7 +25,7 @@
  * in the kernel.)
  *
  * Because of the missing POLLOUT support, ofonod and qmicli don't work on SMD
- * devices, but with this wrapper they do.
+ * devices (they hang waiting to write), but with this wrapper they do.
  *
  * The ioctl is used by the proprietary qmuxd daemon, and I *think* it makes sense
  * to move the waiting from poll() to write().
@@ -99,26 +99,26 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 	if (smd_fd >= 0) {
 		memcpy(orig_fds, fds, sizeof(orig_fds[0]) * nfds);
 
-		int waiting_something_else = 0;
 		for (nfds_t i = 0; i < nfds; i++) {
 			if (fds[i].fd == smd_fd && (fds[i].events & POLLOUT)) {
 				fds[i].events &= ~POLLOUT;
-			} else {
-				waiting_something_else = 1;
+				timeout = 0; // no need to wait; POLLOUT is already "known" to be set
 			}
-		}
-
-		if (!waiting_something_else) {
-			timeout = 0;
 		}
 	}
 
 	int poll_ret = real_func(fds, nfds, timeout);
 
 	if (smd_fd >= 0) {
+		poll_ret = 0; // need to recalculate this
 		for (nfds_t i = 0; i < nfds; i++) {
-			if (fds[i].fd == smd_fd) {
-				fds[i].revents |= (orig_fds[i].events & POLLOUT);
+			if (fds[i].fd == smd_fd && (orig_fds[i].events & POLLOUT)) {
+				if (!(fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))) {
+					fds[i].revents |= POLLOUT;
+				}
+			}
+			if (fds[i].revents) {
+				poll_ret++;
 			}
 		}
 	}
