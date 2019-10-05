@@ -45,6 +45,7 @@
 #include <stdio.h>
 #include <poll.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <string.h>
 
