@@ -1,0 +1,22 @@
+# libsmdpkt_wrapper
+wrapper to get ofonod and qmicli working on smdpkt devices (MSM kernel's SMD)
+
+/*
+ * This is intended as a LD_PRELOAD'ed library. It will look for open()s of
+ * char devices driven by smdpkt. When seen, the SMD_PKT_IOCTL_BLOCKING_WRITE
+ * ioctl will be issued, and poll() calls specifying POLLOUT will act as if
+ * the device is always ready to be written to. (POLLOUT on smdpkt is not supported
+ * in the kernel.)
+ *
+ * Because of the missing POLLOUT support, ofonod and qmicli don't work on SMD
+ * devices (they hang waiting to write), but with this wrapper they do.
+ *
+ * The ioctl is used by the proprietary qmuxd daemon, and I *think* it makes sense
+ * to move the waiting from poll() to write().
+ *
+ * Presumably the poll() fix would be a two-line kernel patch mirroring the
+ * support for POLLIN, but I'd rather not mess with kernel code.
+ *
+ * For simplicity and efficiency, we assume only one smd device will be opened,
+ * and not closed.
+ */
